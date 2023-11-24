@@ -10,6 +10,10 @@ import mockStore from '../__mocks__/store.js'
 import router from "../app/Router.js";
 import { formatDate, formatStatus } from "../app/format.js";
 
+const onNavigate = (pathname) => {
+  document.body.innerHTML = ROUTES({ pathname })
+}
+
 describe("Given I am connected as an employee", () => {
   describe("When I am on Bills Page", () => {
     test("Then bill icon in vertical layout should be highlighted", async () => {
@@ -31,7 +35,7 @@ describe("Given I am connected as an employee", () => {
       document.body.innerHTML = BillsUI({ data: bills })
       const billsContainer = new Bills({
         document: document,
-        onNavigate: router,
+        onNavigate,
         store: mockStore,
         localStorage: localStorageMock,
       })
@@ -57,22 +61,20 @@ describe("Given I am connected as an employee", () => {
       expect(dates).toEqual(datesSorted)
     })
 
-    test("handleClickIconEye should be called and modal should display on eye click", () => {
-      const onNavigateMock = jest.fn();
+    test("Then handleClickIconEye should be called and modal should display on eye click", () => {
       const billContainer = new Bills({
         document: document,
-        onNavigate: onNavigateMock,
+        onNavigate,
         store: mockStore,
         localStorage: localStorageMock,
       });
 
-      billContainer.handleClickIconEye = jest.fn();
-
       const iconEye = screen.getAllByTestId('icon-eye')[0]
-      iconEye.addEventListener('click', () => billContainer.handleClickIconEye(iconEye));
+      const handleClickIconEye = jest.fn(billContainer.handleClickIconEye)
+      iconEye.addEventListener('click', () => handleClickIconEye(iconEye));
       userEvent.click(iconEye);
 
-      expect(billContainer.handleClickIconEye).toHaveBeenCalledWith(iconEye);
+      expect(handleClickIconEye).toHaveBeenCalled();
 
       expect(document.querySelector('.modal')).toBeTruthy();
     });
@@ -80,7 +82,7 @@ describe("Given I am connected as an employee", () => {
     test("Then click on new bills should navigate to NewBill route", () => {
       const billsContainer = new Bills({
         document: document,
-        onNavigate: router,
+        onNavigate,
         store: mockStore,
         localStorage: localStorageMock,
       });
@@ -98,14 +100,7 @@ describe("Given I am connected as an employee", () => {
 // test d'intégration GET pour les factures (bills) en tant qu'employé
 describe('Given I am a user connected as employee', () => {
   describe('When I am on Bills page', () => {
-    test('fetches bills from mock API GET', async () => {
-      const onNavigateMock = jest.fn();
-      const billContainer = new Bills({
-        document: document,
-        onNavigate: onNavigateMock,
-        store: mockStore,
-        localStorage: localStorageMock,
-      });
+    test('Then fetches bills from mock API GET', async () => {
 
       document.body.innerHTML = BillsUI({ data: bills });
       await waitFor(() => screen.getByTestId('tbody'));
@@ -126,7 +121,7 @@ describe('Given I am a user connected as employee', () => {
         router();
       });
 
-      test('fetches bills from an API and fails with 404 message error', async () => {
+      test('Then fetches bills from an API and fails with 404 message error', async () => {
         mockStore.bills.mockImplementationOnce(() => {
           return {
             list: () => {
@@ -141,7 +136,7 @@ describe('Given I am a user connected as employee', () => {
         expect(message).toBeTruthy();
       });
 
-      test('fetches bills from an API and fails with 500 message error', async () => {
+      test('Then fetches bills from an API and fails with 500 message error', async () => {
         mockStore.bills.mockImplementationOnce(() => {
           return {
             list: () => {

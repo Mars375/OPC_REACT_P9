@@ -17,22 +17,22 @@ export default class NewBill {
   }
 
   checkFileExtension(fileInput) {
-    const file = fileInput.files[0]
+    const file = fileInput.files[0];
 
     if (file) {
-      const filePath = fileInput.value
-      const fileExtension = filePath.substring(filePath.lastIndexOf('.') + 1).toLowerCase()
+      const filePath = file.name;
+      const fileExtension = filePath.substring(filePath.lastIndexOf('.') + 1).toLowerCase();
 
       if (!['jpg', 'jpeg', 'png'].includes(fileExtension)) {
-        alert('Extension de fichier non autorisée. Veuillez sélectionner un fichier jpg, jpeg ou png.')
-        fileInput.value = ''
-        return false
+        alert('Extension de fichier non autorisée. Veuillez sélectionner un fichier jpg, jpeg ou png.');
+        fileInput.value = '';
+        return false;
       }
 
-      return true
+      return true;
     }
 
-    return false
+    return false;
   }
 
   handleChangeFile = e => {
@@ -54,7 +54,6 @@ export default class NewBill {
           }
         })
         .then(({ fileUrl, key }) => {
-          console.log(fileUrl)
           this.billId = key
           this.fileUrl = fileUrl
           this.fileName = fileInput.files[0].name
