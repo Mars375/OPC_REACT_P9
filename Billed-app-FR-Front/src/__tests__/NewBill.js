@@ -7,21 +7,24 @@ import mockStore from '../__mocks__/store.js';
 import { localStorageMock } from '../__mocks__/localStorage.js';
 import { ROUTES, ROUTES_PATH } from '../constants/routes.js';
 import NewBillUI from "../views/NewBillUI.js";
-import { screen, fireEvent } from "@testing-library/dom";
+import { screen, fireEvent, waitFor } from "@testing-library/dom";
 import NewBill from "../containers/NewBill.js";
-import router from "../app/Router.js";
+
+const onNavigate = (pathname) => {
+  document.body.innerHTML = ROUTES({ pathname });
+};
 
 describe("Given I am connected as an employee", () => {
   beforeEach(() => {
     Object.defineProperty(window, "localStorage", {
       value: localStorageMock,
     });
-    window.localStorage.setItem(
-      "user",
-      JSON.stringify({
-        type: "Employee",
-      })
-    );
+
+    const user = {
+      type: "Employee",
+    }
+
+    window.localStorage.setItem("user", JSON.stringify(user))
     document.body.innerHTML = NewBillUI({});
   })
 
@@ -42,44 +45,8 @@ describe("Given I am connected as an employee", () => {
       expect(screen.getByTestId("commentary")).toBeInTheDocument();
     });
 
-    describe("When I am uploading an acceptable file", () => {
-      test("Then it should return true for a valid file extension", () => {
-        const onNavigate = (pathname) => {
-          document.body.innerHTML = ROUTES({ pathname });
-        };
-
-        const newBill = new NewBill({
-          document,
-          onNavigate,
-          store: mockStore,
-          localStorage: window.localStorage,
-        });
-
-        const handleChangeFileSpy = jest.spyOn(newBill, "handleChangeFile");
-        let fileInput = screen.getByTestId("file");
-        fireEvent.change(fileInput, {
-          target: {
-            files: [new File(["file contents"], "image.jpg", { type: "image/jpeg" })],
-          },
-        });
-
-        const result = newBill.checkFileExtension(fileInput);
-
-        setTimeout(() => {
-          expect(handleChangeFileSpy).toHaveBeenCalled();
-
-          handleChangeFileSpy.mockRestore();
-        }, 0);
-
-        expect(result).toBe(true);
-      });
-    });
-
-    describe("When I am uploading a file with an invalid extension", () => {
+    describe("When I am uploading a file", () => {
       test("Then it should return false and show alert for invalid file extension", () => {
-        const onNavigate = (pathname) => {
-          document.body.innerHTML = ROUTES({ pathname });
-        };
 
         const newBill = new NewBill({
           document,
@@ -100,11 +67,129 @@ describe("Given I am connected as an employee", () => {
         const result = newBill.checkFileExtension(fileInput);
 
         expect(result).toBe(false);
-
         expect(alertSpy).toHaveBeenCalled();
 
         alertSpy.mockRestore();
       });
+
+      test("Then it should return true for a valid file extension", () => {
+        const newBill = new NewBill({
+          document,
+          onNavigate,
+          store: mockStore,
+          localStorage: window.localStorage,
+        });
+
+        const handleChangeFileSpy = jest.spyOn(newBill, "handleChangeFile");
+        const alertSpy = jest.spyOn(window, "alert").mockImplementation(() => { });
+
+        let fileInput = screen.getByTestId("file");
+
+        fireEvent.change(fileInput, {
+          target: {
+            files: [new File(["file contents"], "image.jpg", { type: "image/jpeg" })],
+          },
+        });
+
+        newBill.handleChangeFile({ preventDefault: jest.fn() });
+
+        const result = newBill.checkFileExtension(fileInput);
+
+        expect(handleChangeFileSpy).toHaveBeenCalled();
+        expect(result).toBe(true);
+
+        handleChangeFileSpy.mockRestore();
+        alertSpy.mockRestore();
+      });
+
+
     });
+
+    test("Then it should update fileUrl and fileName on file selection", async () => {
+      const newBill = new NewBill({
+        document,
+        onNavigate,
+        store: mockStore,
+        localStorage: window.localStorage,
+      });
+
+      const successfulApiResponse = {
+        fileUrl: 'fakeFileUrl',
+        key: 'fakeKey',
+      };
+
+      const createSpy = jest.spyOn(mockStore.bills(), 'create');
+      createSpy.mockImplementation(() => Promise.resolve(successfulApiResponse));
+
+      let fileInput = screen.getByTestId("file");
+      fireEvent.change(fileInput, {
+        target: {
+          files: [new File(["file contents"], "image.jpg", { type: "image/jpeg" })],
+        },
+      });
+
+      await waitFor(() => {
+        expect(createSpy).toHaveBeenCalledWith({
+          data: expect.any(FormData),
+          headers: {
+            noContentType: true,
+          },
+        });
+        expect(newBill.billId).toBe('fakeKey');
+        expect(newBill.fileUrl).toBe('fakeFileUrl');
+        expect(newBill.fileName).toBe('image.jpg');
+      });
+
+      createSpy.mockRestore();
+    })
   });
+
+  describe("When I submit my form", () => {
+    test("Then it should create a bill for a valid form", () => {
+      const newBill = new NewBill({
+        document,
+        onNavigate,
+        store: mockStore,
+        localStorage: window.localStorage,
+      });
+
+      newBill.handleSubmit = jest.fn();
+      newBill.updateBill = jest.fn();
+      newBill.onNavigate = jest.fn();
+
+      const formValues = {
+        type: 'Services en ligne',
+        name: 'Abonnement Cloud',
+        amount: '240',
+        date: '2022-08-30',
+        vat: '40',
+        pct: '20',
+        commentary: 'Test commentary',
+      };
+
+      fireEvent.change(screen.getByTestId("expense-type"), { target: { value: formValues.type } });
+      fireEvent.change(screen.getByTestId("expense-name"), { target: { value: formValues.name } });
+      fireEvent.change(screen.getByTestId("datepicker"), { target: { value: formValues.date } });
+      fireEvent.change(screen.getByTestId("amount"), { target: { value: formValues.amount.toString() } });
+      fireEvent.change(screen.getByTestId("vat"), { target: { value: formValues.vat } });
+      fireEvent.change(screen.getByTestId("pct"), { target: { value: formValues.pct.toString() } });
+      fireEvent.change(screen.getByTestId("commentary"), { target: { value: formValues.commentary } });
+
+      fireEvent.submit(screen.getByTestId('form-new-bill'));
+
+      expect(newBill.updateBill).toHaveBeenCalledWith({
+        type: formValues.type,
+        name: formValues.name,
+        amount: parseInt(formValues.amount),
+        date: formValues.date,
+        vat: formValues.vat,
+        pct: parseInt(formValues.pct) || 20,
+        commentary: formValues.commentary,
+        fileUrl: null,
+        fileName: null,
+        status: 'pending',
+      });
+      expect(newBill.onNavigate).toHaveBeenCalledWith(ROUTES_PATH['Bills']);
+    });
+  })
 });
